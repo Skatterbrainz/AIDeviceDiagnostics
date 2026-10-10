@@ -116,16 +116,21 @@ function Invoke-AIDeviceDiagnostics {
 
 	if ($SubmitPrompt.IsPresent) {
 		$promptString = @"
-Analyze the following Windows diagnostic data:
-
+Analyze the following Windows diagnostic data and provide a summary of the findings:
+1. Rate findings by severity High, Medium, Low
+2. Provide recommendations for each finding based on its severity
+3. Keep responses concise and focused on actionable insights
+4. Categorize by type of finding (e.g., EventLog, Services, Processes, Registry, Disk, Memory, System)
+5. Provide URL links to relevant documentation for each recommendation
+6. Result should be returned in JSON format: Finding, TimeStamp, Severity, Category, Recommendation, DocumentationURL
 $JsonFile
 "@
 		switch ($Provider) {
-			'OpenAI'     { Invoke-OpenAIRequest -Prompt $promptString -ApiKey $ApiKey -Endpoint $Endpoint }
-			'Anthropic'  { Invoke-ClaudeRequest -Prompt $promptString -ApiKey $ApiKey -Endpoint $Endpoint }
-			'AzureOpenAI'{ Invoke-AzureOpenAIRequest -Prompt $promptString -ApiKey $ApiKey -Endpoint $Endpoint }
-			'Google'     { Invoke-GeminiRequest -Prompt $promptString -ApiKey $ApiKey -Endpoint $Endpoint }
-			'Perplexity' { Invoke-PerplexityRequest -Prompt $promptString -ApiKey $ApiKey -Endpoint $Endpoint }
+			'OpenAI'     { Invoke-OpenAIRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
+			'Anthropic'  { Invoke-ClaudeRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
+			'AzureOpenAI'{ Invoke-AzureOpenAIRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
+			'Google'     { Invoke-GeminiRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
+			'Perplexity' { Invoke-PerplexityRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
 		}
 	}
 	if ($PassThru) {
