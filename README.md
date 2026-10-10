@@ -33,6 +33,8 @@ This module is designed for quick, repeatable diagnostics on local machines with
 - Network connectivity for AI provider calls (`-SubmitPrompt`)
 - API Keys stored as Environment Variables (see [API Key Configuration](#-api-key-configuration))
 - Optional on Linux: [`linuxtools`](https://github.com/Skatterbrainz/LinuxTools) module for richer Linux-specific diagnostics
+- Time. We all need more time.
+- Coffee. Yeah, probably need some coffee too (or tea, or energy drinks, if that's your thing)
 
 ## Installation
 
