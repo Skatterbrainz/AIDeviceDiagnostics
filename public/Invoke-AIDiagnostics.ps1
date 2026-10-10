@@ -1,7 +1,7 @@
-function Invoke-AIDeviceDiagnostics {
+function Invoke-AIDiagnostics {
 	<#
 	.SYNOPSIS
-		Invokes AI diagnostics on the local Windows system.
+		Invokes AI diagnostics on the local Windows or Linux system.
 
 	.DESCRIPTION
 		This function collects various system diagnostics based on the specified scope and optionally submits the data to an AI provider for analysis.
@@ -25,6 +25,9 @@ function Invoke-AIDeviceDiagnostics {
 
 	.PARAMETER SubmitPrompt
 		Switch to submit the collected diagnostics to the AI provider.
+
+	.PARAMETER CustomPrompt
+		Specifies a custom prompt to submit to the AI provider.
 
 	.PARAMETER Provider
 		Specifies the AI provider to use. Valid values are 'OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity'.
@@ -54,13 +57,18 @@ function Invoke-AIDeviceDiagnostics {
 		Invoke-AIDiagnostics -Scope EventLog, Services -OutputPath "C:\Diagnostics" -MaxItems 50
 
 		Exports Eventlog and Services diagnostics to the specified output path, limiting the number of items collected to 50.
+	.NOTES
+		Some options only work on Windows, such as collecting Registry information.
+	.LINK
+		https://github.com/Skatterbrainz/Nitrogen/docs/Invoke-AIDiagnostics.md
 	#>
 	[CmdletBinding()]
-    [Alias('Invoke-AIDiagnostics')]
+    [Alias('Invoke-AIDeviceDiagnostics')]
 	param (
-		[parameter(Mandatory=$true)][ValidateSet('EventLog','Services','Processes','Registry','Disk','Memory','System')][string[]]$Scope,
-		[parameter(Mandatory=$false)][string]$OutputPath = $(if ($IsLinux) { Join-Path $env:HOME 'Documents/AIDiagnostics' } else { Join-Path $env:USERPROFILE 'Documents\AIDiagnostics' }),
+		[parameter(Mandatory=$true)][ValidateSet('EventLog','Services','Processes','Registry','Disk','Memory','System','Drivers','All')][string[]]$Scope,
+		[parameter(Mandatory=$false)][string]$OutputPath = $(if ($IsLinux) { Join-Path $env:HOME 'Documents/Nitrogen' } else { Join-Path $env:USERPROFILE 'Documents\Nitrogen' }),
 		[parameter(Mandatory=$false)][switch]$SubmitPrompt,
+		[parameter(Mandatory=$false)][string]$CustomPrompt,
 		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity')][string]$Provider,
 		[parameter(Mandatory=$false)][string]$ApiKey,
 		[parameter(Mandatory=$false)][int]$MaxItems = 100,
@@ -71,10 +79,15 @@ function Invoke-AIDeviceDiagnostics {
 	if (-not (Test-Path $OutputPath)) {
 		New-Item -Path $OutputPath -ItemType Directory | Out-Null
 	}
+	if ($Scope -eq 'All') {
+		$Scope = @('EventLog','Services','Processes','Registry','Disk','Memory','System','Drivers')
+	}
+	Write-Verbose "Diagnostic scopes: $($Scope -join ', ')"
 
 	$Results = [ordered]@{}
 
 	foreach ($Item in $Scope) {
+		Write-Verbose "Processing diagnostic scope: $Item"
 		switch ($Item) {
 			'EventLog' {
                 Write-Verbose "Collecting EventLog diagnostics for $Item"
@@ -103,24 +116,24 @@ function Invoke-AIDeviceDiagnostics {
 			'System' {
                 $Results.System = get-SystemSummary
 			}
+			'Drivers' {
+				$Results.Drivers = Get-SystemDrivers -MaxItems $MaxItems
+			}
 		}
 	}
 
 	$JsonFile = Join-Path $OutputPath "Diagnostics.json"
 
+	Write-Verbose "Saving diagnostics to $JsonFile"
 	$Results | ConvertTo-Json -Depth 5 | Set-Content -Path $JsonFile
 
 	if ($SubmitPrompt.IsPresent) {
-		$promptString = @"
-Analyze the following Windows diagnostic data and provide a summary of the findings:
-1. Rate findings by severity High, Medium, Low
-2. Provide recommendations for each finding based on its severity
-3. Keep responses concise and focused on actionable insights
-4. Categorize by type of finding (e.g., EventLog, Services, Processes, Registry, Disk, Memory, System)
-5. Provide URL links to relevant documentation for each recommendation
-6. Result should be returned in JSON format: Finding, TimeStamp, Severity, Category, Recommendation, DocumentationURL
-$JsonFile
-"@
+		if (![string]::IsNullOrEmpty($CustomPrompt)) {
+			$promptString = $CustomPrompt
+		} else {
+			$promptString = $script:DefaultPrompt
+		}
+		Write-Verbose "Using prompt: $promptString"
 		switch ($Provider) {
 			'OpenAI'     { Invoke-OpenAIRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
 			'Anthropic'  { Invoke-ClaudeRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }

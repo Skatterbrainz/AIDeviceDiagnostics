@@ -1,4 +1,4 @@
-# AIDeviceDiagnostics
+# Nitrogen
 
 PowerShell module for collecting local diagnostics and optionally sending them to AI providers for analysis.
 
@@ -6,7 +6,7 @@ PowerShell module for collecting local diagnostics and optionally sending them t
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-AIDeviceDiagnostics collects targeted system telemetry (event logs, services, processes, disk, memory, and system details), saves the results to JSON, and can submit a prompt to supported AI APIs for troubleshooting guidance.
+Nitrogen collects targeted system telemetry (event logs, services, processes, disk, memory, and system details), saves the results to JSON, and can submit a prompt to supported AI APIs for troubleshooting guidance.
 
 ## 🎯 Overview
 
@@ -40,23 +40,23 @@ This module is designed for quick, repeatable diagnostics on local machines with
 
 PowerShell Core
    ```powershell
-   Install-PSResource AIDeviceDiagnostics
+   Install-PSResource Nitrogen
    ```
 Windows PowerShell
    ```powershell
-   Install-Module AIDeviceDiagnostics
+   Install-Module Nitrogen
    ```
 ### From GitHub
 
 2. **Clone the repository**
    ```bash
-   git clone https://github.com/Skatterbrainz/AIDeviceDiagnostics.git
-   cd AIDeviceDiagnostics
+   git clone https://github.com/Skatterbrainz/Nitrogen.git
+   cd Nitrogen
    ```
 
 3. **Import the module**
    ```powershell
-   Import-Module ./AIDeviceDiagnostics.psd1
+   Import-Module ./Nitrogen.psd1
    ```
 
 ## Usage
@@ -65,7 +65,7 @@ Import the module and run targeted diagnostics:
 
 ```powershell
 # Import module
-Import-Module AIDeviceDiagnostics
+Import-Module Nitrogen
 
 # View command help
 Get-Help Invoke-AIDiagnostics -Full
@@ -85,8 +85,8 @@ Invoke-AIDiagnostics -Scope EventLog,Services,System -SubmitPrompt -Provider Ope
 
 ### Default output path behavior
 
-- **Windows:** `$env:USERPROFILE\Documents\AIDiagnostics`
-- **Linux:** `$env:HOME/Documents/AIDiagnostics`
+- **Windows:** `$env:USERPROFILE\Documents\Nitrogen`
+- **Linux:** `$env:HOME/Documents/Nitrogen`
 
 ## 🔐 API Key Configuration
 
@@ -101,10 +101,14 @@ You can pass `-ApiKey` directly, or set environment variables:
 
 ## Known Issues
 
-- Tested against Gemini and Claude so far.
-- File integration not yet enabled on OpenAI, AzureOpenAI or Perplexity
-- Model queries only ready for Gemini
+- Tested against Gemini, OpenAI and Claude so far.
+- File integration not yet enabled on AzureOpenAI or Perplexity
+- Model queries only ready for Gemini, Perplexity, OpenAI
 - Endpoints are currently hard-coded
+
+## Change/Revision History
+
+- See [Change Log](/changelog.md)
 
 ## Contributing
 
@@ -116,7 +120,7 @@ Contributions are welcome! Feel free to:
 - Improve docs and examples
 - Submit pull requests
 
-Please open an [issue](https://github.com/Skatterbrainz/AIDeviceDiagnostics/issues) or submit a pull request.
+Please open an [issue](https://github.com/Skatterbrainz/Nitrogen/issues) or submit a pull request.
 
 ## License
 

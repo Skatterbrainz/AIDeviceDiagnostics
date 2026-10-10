@@ -1,7 +1,7 @@
 function get-SystemSummary {
 	param()
 	if ($IsLinux) {
-		$Results.System = @{
+		$result = @{
 			ComputerName  = $(hostname)
 			User          = $env:USER
 			Uptime        = $(uptime --pretty)
@@ -12,7 +12,7 @@ function get-SystemSummary {
 			KernelVersion = (hostnamectl | Where-Object { $_.Trim() -like 'Kernel*' } | ForEach-Object { $_.Trim() -replace 'Kernel: ', '' })
 		}
 	} else {
-		$Results.System = @{
+		$result = @{
 			ComputerName = $env:COMPUTERNAME
 			User         = $env:USERNAME
 			Uptime       = (Get-Date) - ((Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime)
@@ -22,4 +22,5 @@ function get-SystemSummary {
 			BIOSVersion  = (Get-CimInstance -ClassName Win32_BIOS).SMBIOSBIOSVersion
 		}
 	}
+	return $result
 }
