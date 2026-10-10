@@ -6,6 +6,12 @@ function Invoke-PerplexityRequest {
 		[Parameter(Mandatory=$false)][string]$ApiKey,
 		[Parameter(Mandatory=$false)][ValidateSet('sonar','sonar-pro','sonar-reasoning','sonar-reasoning-pro','sonar-deep-research')][string]$Model = 'sonar-pro'
 	)
+	Write-Warning "This function has not yet been fully implemented."
+	$proceed = Read-Host "Do you want to proceed? (Y/N)"
+	if ($proceed -ne 'Y') {
+		Write-Verbose "Aborting Perplexity request."
+		return
+	}
 	Write-Verbose 'Invoking Perplexity request with model $Model'
 	if (-not $ApiKey) {
 		$ApiKey = $env:PERPLEXITY_API_KEY

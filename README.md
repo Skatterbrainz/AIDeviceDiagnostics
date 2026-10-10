@@ -99,6 +99,13 @@ You can pass `-ApiKey` directly, or set environment variables:
 - `GEMINI_API_KEY`
 - `PERPLEXITY_API_KEY`
 
+## Known Issues
+
+- Tested against Gemini and Claude so far.
+- File integration not yet enabled on OpenAI, AzureOpenAI or Perplexity
+- Model queries only ready for Gemini
+- Endpoints are currently hard-coded
+
 ## Contributing
 
 Contributions are welcome! Feel free to:

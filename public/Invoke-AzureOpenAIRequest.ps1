@@ -6,6 +6,12 @@ function Invoke-AzureOpenAIRequest {
 		[Parameter(Mandatory=$false)][string]$ApiKey,
 		[Parameter(Mandatory=$false)][string]$Model = "gpt-5"
 	)
+	Write-Warning "This function has not yet been fully implemented."
+	$proceed = Read-Host "Do you want to proceed? (Y/N)"
+	if ($proceed -ne 'Y') {
+		Write-Verbose "Aborting Azure OpenAI request."
+		return
+	}
 	Write-Verbose "Invoking Azure OpenAI request with model $Model"
 	if ([string]::IsNullOrEmpty($Endpoint)) {
 		$Endpoint = $env:AZURE_OPENAI_ENDPOINT

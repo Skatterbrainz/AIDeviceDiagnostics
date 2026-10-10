@@ -12,9 +12,6 @@ function Invoke-AIDeviceDiagnostics {
 	.PARAMETER OutputPath
 		Specifies the path to save the diagnostic results. Defaults to "$env:USERPROFILE\Documents\AIDiagnostics" on Windows and "$env:HOME/Documents/AIDiagnostics" on Linux.
 
-	.PARAMETER Endpoint
-		Specifies the API endpoint for the AI provider.
-
 	.PARAMETER ApiKey
 		Specifies the API key for the AI provider.
 
@@ -66,7 +63,6 @@ function Invoke-AIDeviceDiagnostics {
 		[parameter(Mandatory=$false)][switch]$SubmitPrompt,
 		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity')][string]$Provider,
 		[parameter(Mandatory=$false)][string]$ApiKey,
-		[parameter(Mandatory=$false)][string]$Endpoint,
 		[parameter(Mandatory=$false)][int]$MaxItems = 100,
 		[parameter(Mandatory=$false)][switch]$PassThru,
 		[parameter(Mandatory=$false)][switch]$JSonOutput
