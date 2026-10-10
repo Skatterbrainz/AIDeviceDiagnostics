@@ -69,7 +69,12 @@ ProcessorArchitecture = 'Amd64'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = '*'
+FunctionsToExport = @(
+    'Invoke-AIDeviceDiagnostics',
+    'get-GeminiModels',
+    'get-OpenAIModels',
+    'get-PerplexityModels'
+)
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = '*'
@@ -95,13 +100,13 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('ai','diagnostics','device','windows','skatterbrainz')
+        Tags = @('ai','diagnostics','device','windows','linux','troubleshoot','skatterbrainz')
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        LicenseUri = 'https://github.com/Skatterbrainz/AIDeviceDiagnostics/blob/main/LICENSE'
 
         # A URL to the main website for this project.
-        ProjectUri = 'https://github.com/skatterbrainz/AIDeviceDiagnostics'
+        ProjectUri = 'https://github.com/Skatterbrainz/AIDeviceDiagnostics'
 
         # A URL to an icon representing this module.
         # IconUri = ''
