@@ -31,20 +31,22 @@ This module is designed for quick, repeatable diagnostics on local machines with
 - PowerShell 5.1 or higher
 - Windows PowerShell or PowerShell (Core) on Windows/Linux
 - Network connectivity for AI provider calls (`-SubmitPrompt`)
+- API Keys stored as Environment Variables (see [API Key Configuration](#-api-key-configuration))
 - Optional on Linux: [`linuxtools`](https://github.com/Skatterbrainz/LinuxTools) module for richer Linux-specific diagnostics
 
 ## Installation
 
-### From GitHub
+### From PowerShell Gallery
 
-1. **PowerShell Gallery**
+PowerShell Core
    ```powershell
    Install-PSResource AIDeviceDiagnostics
    ```
-   or
+Windows PowerShell
    ```powershell
    Install-Module AIDeviceDiagnostics
    ```
+### From GitHub
 
 2. **Clone the repository**
    ```bash
@@ -91,7 +93,7 @@ Invoke-AIDiagnostics -Scope EventLog,Services,System -SubmitPrompt -Provider Ope
 You can pass `-ApiKey` directly, or set environment variables:
 
 - `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_API_KEY` (for Claude)
 - `AZURE_OPENAI_API_KEY`
 - `AZURE_OPENAI_ENDPOINT` (for Azure OpenAI)
 - `GEMINI_API_KEY`
