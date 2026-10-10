@@ -1,4 +1,33 @@
 function Invoke-ClaudeRequest {
+	<#
+	.SYNOPSIS
+		Invokes a request to the Claude API with the specified prompt and file.
+	.DESCRIPTION
+		Uploads the specified file to the Claude API and sends the prompt for processing.
+	.PARAMETER Prompt
+		The prompt to send to the Claude API.
+	.PARAMETER File
+		The path to the file to upload.
+	.PARAMETER Endpoint
+		The Claude API endpoint for generating content. Defaults to "https://api.anthropic.com/v1/messages".
+	.PARAMETER FilesEndpoint
+		The Claude API endpoint for uploading files. Defaults to "https://api.anthropic.com/v1/files".
+	.PARAMETER ApiKey
+		The Anthropic API key. If not provided, the ANTHROPIC_API_KEY environment variable will be used.
+	.PARAMETER Model
+		The Claude model to use. Defaults to "claude-sonnet-5-5".
+	.PARAMETER ApiVersion
+		The Anthropic API version to use. Defaults to "2023-06-01".
+	.PARAMETER MaxTokens
+		The maximum number of tokens to generate. Defaults to 1024.
+	.EXAMPLE
+		Invoke-ClaudeRequest -Prompt "Hello" -File "example.txt"
+		Submits the prompt and file to the Claude API for processing.
+	.NOTES
+		This function requires a valid Anthropic API key and a file to upload.
+		Ensure that the file size does not exceed 100 MB.
+		The -Prompt and -File parameters are provided by Invoke-AIDeviceDiagnostics automatically.
+	#>
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory=$true)][string]$Prompt,

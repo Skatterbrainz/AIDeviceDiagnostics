@@ -24,55 +24,58 @@ function Invoke-OpenAIRequest {
 		The -Prompt and -File parameters are provided from Invoke-AIDeviceDiagnostics automatically.
 		Ensure that the OPENAI_API_KEY environment variable is set if the -ApiKey parameter is not used.
 	#>
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true)][string]$Prompt,
-        [Parameter(Mandatory=$true)][string]$File,
-        [Parameter(Mandatory=$false)][string]$Endpoint = "https://api.openai.com/v1/responses",
-        [Parameter(Mandatory=$false)][string]$FilesEndpoint = "https://api.openai.com/v1/files",
-        [Parameter(Mandatory=$false)][string]$ApiKey,
-        [Parameter(Mandatory=$false)][string]$Model = "gpt-5"
-    )
-    Write-Verbose "Invoking OpenAI request with model $Model"
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory=$true)][string]$Prompt,
+		[Parameter(Mandatory=$true)][string]$File,
+		[Parameter(Mandatory=$false)][string]$Endpoint = "https://api.openai.com/v1/responses",
+		[Parameter(Mandatory=$false)][string]$FilesEndpoint = "https://api.openai.com/v1/files",
+		[Parameter(Mandatory=$false)][string]$ApiKey,
+		[Parameter(Mandatory=$false)][string]$Model = "gpt-5"
+	)
+	Write-Verbose "Invoking OpenAI request with model $Model"
 
-    if (-not $ApiKey) { $ApiKey = $env:OPENAI_API_KEY }
-    if (-not $ApiKey) {
-        throw "OpenAI API key is not set. Provide it via -ApiKey or the OPENAI_API_KEY environment variable."
-    }
-    if (-not (Test-Path $File)) { throw "File not found: $File" }
+	if (-not $ApiKey) { $ApiKey = $env:OPENAI_API_KEY }
+	if (-not $ApiKey) {
+		throw "OpenAI API key is not set. Provide it via -ApiKey or the OPENAI_API_KEY environment variable."
+	}
+	if (-not (Test-Path $File)) { throw "File not found: $File" }
 
-    # Upload
-    Write-Verbose "Uploading file $File"
-    $FileResponse = Invoke-RestMethod -Uri $FilesEndpoint -Method Post `
-        -Headers @{ "Authorization" = "Bearer $ApiKey" } `
-        -Form @{ purpose = "user_data"; file = Get-Item $File }
-    if (-not $FileResponse.id) { throw "Failed to upload file to OpenAI." }
-    Write-Verbose "Uploaded file with ID $($FileResponse.id)"
+	Write-Verbose "Uploading file $File"
+	$FileResponse = Invoke-RestMethod -Uri $FilesEndpoint -Method Post `
+		-Headers @{ "Authorization" = "Bearer $ApiKey" } `
+		-Form @{ purpose = "user_data"; file = Get-Item $File }
+	if (-not $FileResponse.id) { throw "Failed to upload file to OpenAI." }
+	Write-Verbose "Uploaded file with ID $($FileResponse.id)"
 
-    # Build request
-    $Body = @{
-        model = $Model
-        input = @(
-            @{
-                role    = "user"
-                content = @(
-                    @{ type = "input_file"; file_id = $FileResponse.id },
-                    @{ type = "input_text"; text = $Prompt }
-                )
-            }
-        )
-    } | ConvertTo-Json -Depth 10
+	$Body = @{
+		model = $Model
+		input = @(
+			@{
+				role    = "user"
+				content = @(
+					@{ type = "input_file"; file_id = $FileResponse.id },
+					@{ type = "input_text"; text = $Prompt }
+				)
+			}
+		)
+	} | ConvertTo-Json -Depth 10
 
-    # Call
-    $Response = Invoke-RestMethod -Uri $Endpoint -Method Post `
-        -Headers @{ "Authorization" = "Bearer $ApiKey"; "Content-Type" = "application/json" } `
-        -Body ([System.Text.Encoding]::UTF8.GetBytes($Body)) `
-        -SkipHttpErrorCheck -StatusCodeVariable "statusCode"
+	$requestParams = @{
+		Uri                = $Endpoint
+		Method             = "Post"
+		Headers            = @{ "Authorization" = "Bearer $ApiKey"; "Content-Type" = "application/json" }
+		Body               = ([System.Text.Encoding]::UTF8.GetBytes($Body))
+		ErrorAction        = 'Stop'
+		SkipHttpErrorCheck = $true
+		StatusCodeVariable = "statusCode"
+	}
+	$Response = Invoke-RestMethod @requestParams
 
-    if ($statusCode -ne 200) {
-        throw "OpenAI API request failed ($statusCode): $($Response | ConvertTo-Json -Depth 5)"
-    }
+	if ($statusCode -ne 200) {
+		throw "OpenAI API request failed ($statusCode): $($Response | ConvertTo-Json -Depth 5)"
+	}
 
-    $Response.output | Where-Object { $_.type -eq "message" } |
-        ForEach-Object { $_.content | Where-Object { $_.type -eq "output_text" } | ForEach-Object { $_.text } }
+	$Response.output | Where-Object { $_.type -eq "message" } |
+		ForEach-Object { $_.content | Where-Object { $_.type -eq "output_text" } | ForEach-Object { $_.text } }
 }

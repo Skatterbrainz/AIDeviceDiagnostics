@@ -1,4 +1,29 @@
 function Invoke-GeminiRequest {
+	<#
+	.SYNOPSIS
+		Invokes a request to the Google Gemini API with the specified prompt and file.
+	.DESCRIPTION
+		Uploads the specified file to the Google Gemini API and sends the prompt for processing.
+	.PARAMETER Prompt
+		The prompt to send to the Google Gemini API.
+	.PARAMETER File
+		The path to the file to upload.
+	.PARAMETER Endpoint
+		The Google Gemini API endpoint for generating content. Defaults to "https://generativelanguage.googleapis.com/v1beta".
+	.PARAMETER FilesEndpoint
+		The Google Gemini API endpoint for uploading files. Defaults to "https://generativelanguage.googleapis.com/v1beta/files".
+	.PARAMETER ApiKey
+		The Google Gemini API key. If not provided, the GEMINI_API_KEY environment variable will be used.
+	.PARAMETER Model
+		The Google Gemini model to use. Defaults to "gemini-3.5-flash".
+	.EXAMPLE
+		Invoke-GeminiRequest -Prompt "Hello" -File "example.txt"
+		Submits the prompt and file to the Google Gemini API for processing.
+	.NOTES
+		This function requires a valid Google Gemini API key and a file to upload.
+		Ensure that the file size does not exceed 100 MB.
+		The -Prompt and -File parameters are provided by Invoke-AIDeviceDiagnostics automatically.
+	#>
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory=$true)][string]$Prompt,

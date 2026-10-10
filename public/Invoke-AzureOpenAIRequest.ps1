@@ -2,7 +2,9 @@ function Invoke-AzureOpenAIRequest {
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory=$true)][string]$Prompt,
+		[Parameter(Mandatory=$true)][string]$File,
 		[Parameter(Mandatory=$false)][string]$Endpoint,
+		[Parameter(Mandatory=$false)][string]$DeploymentId,
 		[Parameter(Mandatory=$false)][string]$ApiKey,
 		[Parameter(Mandatory=$false)][string]$Model = "gpt-5"
 	)

@@ -1,4 +1,19 @@
 function Get-OpenAIModels {
+    <#
+    .SYNOPSIS
+        Retrieves a list of available OpenAI models.
+    .DESCRIPTION
+        Calls the OpenAI API to list all available models, handling pagination automatically.
+    .PARAMETER Endpoint
+        The OpenAI API endpoint for listing models. Defaults to "https://api.openai.com/v1/models".
+    .PARAMETER ApiKey
+        The OpenAI API key. If not provided, the OPENAI_API_KEY environment variable will be used.
+    .PARAMETER PageSize
+        The number of models to retrieve per API request. Defaults to 100.
+    .EXAMPLE
+        Get-OpenAIModels
+        Retrieves the list of available OpenAI models using the specified API key, fetching 100 models per request.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$false)][string]$Endpoint = "https://api.openai.com/v1/models",

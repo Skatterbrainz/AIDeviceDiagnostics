@@ -1,4 +1,17 @@
 function Get-GeminiModels {
+	<#
+	.SYNOPSIS
+		Retrieves a list of available Google Gemini models.
+	.DESCRIPTION
+		Calls the Google Gemini API to list all available models.
+	.PARAMETER ApiKey
+		The Google Gemini API key. If not provided, the GEMINI_API_KEY environment variable will be used.
+	.PARAMETER Refresh
+		Forces a refresh of the cached models.
+	.EXAMPLE
+		Get-GeminiModels
+		Retrieves the list of available Google Gemini models using the specified API key.
+	#>
 	[CmdletBinding()]
 	param(
 		[parameter(Mandatory=$false)][string]$ApiKey,

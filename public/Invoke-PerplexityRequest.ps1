@@ -2,6 +2,7 @@ function Invoke-PerplexityRequest {
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory=$true)][string]$Prompt,
+		[Parameter(Mandatory=$true)][string]$File,
 		[Parameter(Mandatory=$false)][string]$Endpoint = 'https://api.perplexity.ai/chat/completions',
 		[Parameter(Mandatory=$false)][string]$ApiKey,
 		[Parameter(Mandatory=$false)][ValidateSet('sonar','sonar-pro','sonar-reasoning','sonar-reasoning-pro','sonar-deep-research')][string]$Model = 'sonar-pro'
