@@ -1,4 +1,4 @@
 # Future Plans
 
-1. Some sort of centralized storage interface for providers, API keys, endpoints, prompts, default provider
-2. Dynamic model selection per provider
+1. Dynamic model selection per provider.
+2. Enhance exception output to handle: contains "Your credit balance is too low" for a prettier output message.
