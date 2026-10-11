@@ -14,7 +14,8 @@ Collects local system diagnostics and optionally submits them to an AI provider 
 
 ```powershell
 Invoke-AIDiagnostics -Scope <String[]> [-OutputPath <String>] [-SubmitPrompt] [-Provider <String>]
- [-ApiKey <String>] [-MaxItems <Int32>] [-PassThru] [-JSonOutput] [<CommonParameters>]
+ [-Profile <String>] [-ConfigPath <String>] [-ApiKey <String>] [-MaxItems <Int32>] [-PassThru]
+ [-JSonOutput] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -24,6 +25,16 @@ results to `Diagnostics.json` in the selected output path.
 
 You can optionally submit the collected diagnostics to a supported AI provider for summarized
 analysis and recommendations.
+
+When `-SubmitPrompt` is used, provider settings can be resolved from configuration files:
+
+- Global: `~/.nitrogen/config.json`
+- Local: `./.nitrogen/config.json`
+- Optional explicit overlay: `-ConfigPath`
+
+Precedence (highest to lowest): command parameters, local config, global config, built-in defaults.
+
+`-Profile` selects which profile under `profiles` to use.
 
 On Linux, registry collection is skipped with a warning.
 
@@ -72,6 +83,22 @@ Invoke-AIDiagnostics -Scope EventLog, Services -OutputPath "C:\Diagnostics" -Max
 ```
 
 Exports EventLog and Services diagnostics while limiting each scoped collection to 50 items.
+
+### Example 6
+
+```powershell
+Invoke-AIDiagnostics -Scope EventLog, Services -SubmitPrompt -Profile default
+```
+
+Loads provider and prompt settings from the `default` profile in config.
+
+### Example 7
+
+```powershell
+Invoke-AIDiagnostics -Scope EventLog, Services -SubmitPrompt -Provider OpenAI -PassThru
+```
+
+Returns diagnostics plus a `Diagnosis` collection containing the AI response metadata and output.
 
 ## PARAMETERS
 
@@ -167,10 +194,42 @@ Specifies an API key for the selected provider.
 
 You can also use environment variables:
 - `$env:OPENAI_API_KEY`
-- `$env:CLAUDE_API_KEY`
+- `$env:ANTHROPIC_API_KEY`
 - `$env:GEMINI_API_KEY`
 - `$env:AZURE_OPENAI_API_KEY`
 - `$env:PERPLEXITY_API_KEY`
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Profile
+
+Specifies which configuration profile to use from config files.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: defaults.profile or "default"
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ConfigPath
+
+Specifies an additional config file path to merge on top of global and local config.
 
 ```yaml
 Type: String
@@ -204,7 +263,8 @@ Accept wildcard characters: False
 
 Returns collected diagnostics to the pipeline.
 
-Use with `-JSonOutput` to return JSON instead of objects.
+Use with `-JSonOutput` to return JSON instead of objects. When `-SubmitPrompt` is also used, the
+returned payload includes a `Diagnosis` collection with the provider response.
 
 ```yaml
 Type: SwitchParameter
@@ -244,11 +304,13 @@ You can't pipe objects to this function.
 
 ### System.Collections.Specialized.OrderedDictionary
 
-Returned when `-PassThru` is specified and `-JSonOutput` is not used.
+Returned when `-PassThru` is specified and `-JSonOutput` is not used. Includes `Diagnosis` when
+`-SubmitPrompt` is used.
 
 ### System.String
 
-Returned when `-PassThru -JSonOutput` is specified.
+Returned when `-PassThru -JSonOutput` is specified. Includes `Diagnosis` when `-SubmitPrompt` is
+used.
 
 ### None
 
@@ -259,6 +321,9 @@ No output is written unless `-PassThru` is specified.
 Alias: `Invoke-AIDeviceDiagnostics`
 
 Some options are platform-specific. Registry diagnostics are only available on Windows.
+
+For secure cross-device workflows, keep non-secret settings in config files and store API keys in a
+secret vault (for example SecretManagement + SecretStore) referenced by `apiKeyRef`.
 
 ## RELATED LINKS
 
