@@ -18,7 +18,7 @@ function Invoke-AIDiagnostics {
 		Store API keys in environment variables:
 
 		$env:OPENAI_API_KEY
-		$env:CLAUDE_API_KEY
+		$env:ANTHROPIC_API_KEY
 		$env:GEMINI_API_KEY
 		$env:AZURE_OPENAI_API_KEY
 		$env:PERPLEXITY_API_KEY
@@ -31,6 +31,12 @@ function Invoke-AIDiagnostics {
 
 	.PARAMETER Provider
 		Specifies the AI provider to use. Valid values are 'OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity'.
+
+	.PARAMETER Profile
+		Specifies the configuration profile to use from config.json.
+
+	.PARAMETER ConfigPath
+		Specifies an explicit config.json path to merge on top of global and local configuration.
 
 	.PARAMETER PassThru
 		Switch to return the collected diagnostics as output.
@@ -70,11 +76,27 @@ function Invoke-AIDiagnostics {
 		[parameter(Mandatory=$false)][switch]$SubmitPrompt,
 		[parameter(Mandatory=$false)][string]$CustomPrompt,
 		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity')][string]$Provider,
+		[parameter(Mandatory=$false)][string]$Profile,
+		[parameter(Mandatory=$false)][string]$ConfigPath,
 		[parameter(Mandatory=$false)][string]$ApiKey,
 		[parameter(Mandatory=$false)][int]$MaxItems = 100,
 		[parameter(Mandatory=$false)][switch]$PassThru,
 		[parameter(Mandatory=$false)][switch]$JSonOutput
 	)
+
+	$Config = Get-NitrogenEffectiveConfig -ConfigPath $ConfigPath
+	$ResolvedProfile = Resolve-NitrogenProfileConfig -Config $Config -Profile $Profile
+	$Defaults = Get-NitrogenMemberValue -InputObject $Config -Name 'defaults'
+
+	if (-not $PSBoundParameters.ContainsKey('MaxItems')) {
+		$ConfiguredMaxItems = Get-NitrogenMemberValue -InputObject $ResolvedProfile.Config -Name 'maxItems'
+		if ($null -eq $ConfiguredMaxItems) {
+			$ConfiguredMaxItems = Get-NitrogenMemberValue -InputObject $Defaults -Name 'maxItems'
+		}
+		if ($null -ne $ConfiguredMaxItems) {
+			$MaxItems = [int]$ConfiguredMaxItems
+		}
+	}
 
 	if (-not (Test-Path $OutputPath)) {
 		New-Item -Path $OutputPath -ItemType Directory | Out-Null
@@ -128,23 +150,121 @@ function Invoke-AIDiagnostics {
 	$Results | ConvertTo-Json -Depth 5 | Set-Content -Path $JsonFile
 
 	if ($SubmitPrompt.IsPresent) {
+		$ProviderFromProfile = Get-NitrogenMemberValue -InputObject $ResolvedProfile.Config -Name 'provider'
+		$ProviderFromDefaults = Get-NitrogenMemberValue -InputObject $Defaults -Name 'provider'
+		$ResolvedProvider = if (-not [string]::IsNullOrWhiteSpace($Provider)) { $Provider } elseif (-not [string]::IsNullOrWhiteSpace($ProviderFromProfile)) { $ProviderFromProfile } else { $ProviderFromDefaults }
+		if ([string]::IsNullOrWhiteSpace($ResolvedProvider)) {
+			throw "Provider is required when using -SubmitPrompt. Specify -Provider or configure defaults.provider/profile.provider."
+		}
+		$ProviderConfig = Resolve-NitrogenProviderConfig -ProfileConfig $ResolvedProfile.Config -Provider $ResolvedProvider
+
 		if (![string]::IsNullOrEmpty($CustomPrompt)) {
 			$promptString = $CustomPrompt
 		} else {
-			$promptString = $script:DefaultPrompt
+			$promptFromConfig = Get-NitrogenPromptText -Config $Config -ProfileConfig $ResolvedProfile.Config
+			$promptString = if ([string]::IsNullOrWhiteSpace($promptFromConfig)) { $script:DefaultPrompt } else { $promptFromConfig }
 		}
+		$ResolvedApiKey = if (-not [string]::IsNullOrWhiteSpace($ApiKey)) { $ApiKey } else { Get-NitrogenApiKey -Provider $ResolvedProvider -ProviderConfig $ProviderConfig }
 		Write-Verbose "Using prompt: $promptString"
-		switch ($Provider) {
-			'OpenAI'     { Invoke-OpenAIRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
-			'Anthropic'  { Invoke-ClaudeRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
-			'AzureOpenAI'{ Invoke-AzureOpenAIRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
-			'Google'     { Invoke-GeminiRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
-			'Perplexity' { Invoke-PerplexityRequest -Prompt $promptString -ApiKey $ApiKey -File $JsonFile }
+		$ProviderResponse = $null
+		switch ($ResolvedProvider) {
+			'OpenAI' {
+				$requestParams = @{
+					Prompt = $promptString
+					ApiKey = $ResolvedApiKey
+					File   = $JsonFile
+				}
+				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
+				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
+				$filesEndpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'filesEndpoint'
+				if (-not [string]::IsNullOrWhiteSpace($filesEndpoint)) { $requestParams['FilesEndpoint'] = $filesEndpoint }
+				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
+				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+				$ProviderResponse = Invoke-OpenAIRequest @requestParams
+			}
+			'Anthropic' {
+				$requestParams = @{
+					Prompt = $promptString
+					ApiKey = $ResolvedApiKey
+					File   = $JsonFile
+				}
+				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
+				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
+				$filesEndpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'filesEndpoint'
+				if (-not [string]::IsNullOrWhiteSpace($filesEndpoint)) { $requestParams['FilesEndpoint'] = $filesEndpoint }
+				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
+				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+				$apiVersion = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'apiVersion'
+				if (-not [string]::IsNullOrWhiteSpace($apiVersion)) { $requestParams['ApiVersion'] = $apiVersion }
+				$maxTokens = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'maxTokens'
+				if ($null -ne $maxTokens) { $requestParams['MaxTokens'] = [int]$maxTokens }
+				$ProviderResponse = Invoke-ClaudeRequest @requestParams
+			}
+			'AzureOpenAI' {
+				$requestParams = @{
+					Prompt = $promptString
+					ApiKey = $ResolvedApiKey
+					File   = $JsonFile
+				}
+				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
+				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
+				$deploymentId = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'deploymentId'
+				if (-not [string]::IsNullOrWhiteSpace($deploymentId)) { $requestParams['DeploymentId'] = $deploymentId }
+				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
+				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+				$ProviderResponse = Invoke-AzureOpenAIRequest @requestParams
+			}
+			'Google' {
+				$requestParams = @{
+					Prompt = $promptString
+					ApiKey = $ResolvedApiKey
+					File   = $JsonFile
+				}
+				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
+				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
+				$filesEndpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'filesEndpoint'
+				if (-not [string]::IsNullOrWhiteSpace($filesEndpoint)) { $requestParams['FilesEndpoint'] = $filesEndpoint }
+				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
+				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+				$ProviderResponse = Invoke-GeminiRequest @requestParams
+			}
+			'Perplexity' {
+				$requestParams = @{
+					Prompt = $promptString
+					ApiKey = $ResolvedApiKey
+					File   = $JsonFile
+				}
+				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
+				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
+				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
+				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+				$ProviderResponse = Invoke-PerplexityRequest @requestParams
+			}
+		}
+		$ResponseItems = @()
+		if ($null -ne $ProviderResponse) {
+			if ($ProviderResponse -is [string]) {
+				$ResponseItems = @($ProviderResponse)
+			}
+			elseif ($ProviderResponse -is [System.Collections.IEnumerable]) {
+				$ResponseItems = @($ProviderResponse)
+			}
+			else {
+				$ResponseItems = @($ProviderResponse)
+			}
+		}
+		if (-not $Results.Contains('Diagnosis')) {
+			$Results['Diagnosis'] = @()
+		}
+		$Results.Diagnosis += [pscustomobject]@{
+			Provider   = $ResolvedProvider
+			Generated  = (Get-Date).ToString('o')
+			Collection = $ResponseItems
 		}
 	}
 	if ($PassThru) {
 		if ($JSonOutput) {
-			$Results | ConvertTo-Json -Depth 5
+			$Results | ConvertTo-Json -Depth 10
 		} else {
 			$Results
 		}
