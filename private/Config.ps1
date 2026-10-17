@@ -164,8 +164,11 @@ function Test-NitrogenConfig {
 				if (-not [Uri]::TryCreate($endpoint, [UriKind]::Absolute, [ref]$uri)) {
 					throw "Invalid config in '$Source': provider '$providerName' in profile '$profileName' has invalid endpoint '$endpoint'."
 				}
-				if ($uri.Scheme -ne 'https') {
-					throw "Invalid config in '$Source': provider '$providerName' in profile '$profileName' endpoint must use https."
+				# Ollama is typically hosted on-premises and serves plain http by default.
+				$allowedSchemes = if ($providerName -eq 'Ollama') { @('http', 'https') } else { @('https') }
+				if ($uri.Scheme -notin $allowedSchemes) {
+					$schemeHint = if ($providerName -eq 'Ollama') { 'http or https' } else { 'https' }
+					throw "Invalid config in '$Source': provider '$providerName' in profile '$profileName' endpoint must use $schemeHint."
 				}
 			}
 		}
@@ -257,7 +260,7 @@ function Get-NitrogenPromptText {
 function Get-NitrogenApiKey {
 	[CmdletBinding()]
 	param (
-		[Parameter(Mandatory = $true)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity')][string]$Provider,
+		[Parameter(Mandatory = $true)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity', 'Ollama')][string]$Provider,
 		[Parameter(Mandatory = $false)][hashtable]$ProviderConfig = @{}
 	)
 	$envVarName = switch ($Provider) {
@@ -266,6 +269,7 @@ function Get-NitrogenApiKey {
 		'AzureOpenAI'{ 'AZURE_OPENAI_API_KEY' }
 		'Google'     { 'GEMINI_API_KEY' }
 		'Perplexity' { 'PERPLEXITY_API_KEY' }
+		'Ollama'     { 'OLLAMA_API_KEY' }   # optional: Ollama itself needs no key
 	}
 	$envValue = [Environment]::GetEnvironmentVariable($envVarName)
 	if (-not [string]::IsNullOrWhiteSpace($envValue)) {

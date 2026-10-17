@@ -15,7 +15,7 @@ This module is designed for quick, repeatable diagnostics on local machines with
 - collect only the scopes you care about
 - capture problematic-only entries where supported
 - persist output to disk for audit/sharing
-- optionally submit a summary prompt to OpenAI, Anthropic, Azure OpenAI, Google Gemini, or Perplexity
+- optionally submit a summary prompt to OpenAI, Anthropic, Azure OpenAI, Google Gemini, Perplexity, or an on-premises [Ollama](https://ollama.com) server
 
 ## ✨ Features
 
@@ -165,6 +165,7 @@ You can pass `-ApiKey` directly, or set environment variables:
 - `AZURE_OPENAI_ENDPOINT` (for Azure OpenAI)
 - `GEMINI_API_KEY`
 - `PERPLEXITY_API_KEY`
+- `OLLAMA_API_KEY` (optional, only needed if Ollama is behind an authenticating reverse proxy)
 
 Or use SecretManagement and reference a secret name via `apiKeyRef`:
 
@@ -192,11 +193,43 @@ Get-NitrogenConfig -Scope Local
 Set-NitrogenPrompt -Scope Local -Key diagnostics.brief -Prompt "Summarize only urgent issues." -ProfileName default
 ```
 
+## 🏠 On-Premises Models (Ollama)
+
+Nitrogen can submit diagnostics to a local or on-premises [Ollama](https://ollama.com) server instead of a paid cloud API. Diagnostics data never leaves your network.
+
+1. Install Ollama on a host (a GPU helps) and pull a model: `ollama pull llama3.1:8b`
+2. To serve other machines, set `OLLAMA_HOST=0.0.0.0:11434` on the Ollama host. By default it listens on localhost only.
+3. Point a provider entry at it in `config.json`:
+
+```json
+"Ollama": {
+  "endpoint": "http://ollama01.contoso.local:11434",
+  "model": "llama3.1:8b",
+  "numCtx": 16384,
+  "maxTokens": 2048,
+  "timeoutSec": 300
+}
+```
+
+4. Verify connectivity and available models, then run a diagnosis:
+
+```powershell
+Get-OllamaModels -Endpoint "http://ollama01.contoso.local:11434"
+Invoke-AIDiagnostics -Scope EventLog,Services -SubmitPrompt -Provider Ollama -PassThru
+```
+
+Notes:
+
+- `http://` endpoints are accepted for the Ollama provider only. Ollama has no built-in authentication or TLS, so if it is reachable beyond localhost, put it behind a reverse proxy with TLS and restrict access with a firewall. If the proxy requires a key, set `OLLAMA_API_KEY`.
+- `numCtx` is the context window in tokens. Ollama's default is small and silently truncates large inputs, so keep `numCtx` large enough for the data you collect. Nitrogen warns when `Diagnostics.json` looks too big. Lowering `-MaxItems` or collecting fewer scopes also helps.
+- Smaller local models follow the "return JSON" and "provide documentation URLs" instructions less reliably than hosted models. Set `"format": "json"` to constrain output, and treat any URLs as unverified.
+
 ## Known Issues
 
 - Tested against Gemini, OpenAI and Claude so far.
 - File integration not yet enabled on AzureOpenAI or Perplexity
-- Model queries only ready for Gemini, Perplexity, OpenAI
+- Model queries only ready for Gemini, Perplexity, OpenAI, Anthropic and Ollama
+- Ollama support is new and has not been tested against a wide range of models
 
 ## Change/Revision History
 

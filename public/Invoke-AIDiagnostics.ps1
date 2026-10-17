@@ -22,6 +22,7 @@ function Invoke-AIDiagnostics {
 		$env:GEMINI_API_KEY
 		$env:AZURE_OPENAI_API_KEY
 		$env:PERPLEXITY_API_KEY
+		$env:OLLAMA_API_KEY (optional, only needed behind an authenticating proxy)
 
 	.PARAMETER SubmitPrompt
 		Switch to submit the collected diagnostics to the AI provider.
@@ -30,7 +31,11 @@ function Invoke-AIDiagnostics {
 		Specifies a custom prompt to submit to the AI provider.
 
 	.PARAMETER Provider
-		Specifies the AI provider to use. Valid values are 'OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity'.
+		Specifies the AI provider to use. Valid values are 'OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity', 'Ollama'.
+
+		'Ollama' submits to an on-premises Ollama server. Set the server address and model under
+		providers.Ollama (endpoint, model, numCtx, maxTokens, timeoutSec, keepAlive, format) in config.json.
+		No API key is required.
 
 	.PARAMETER Profile
 		Specifies the configuration profile to use from config.json.
@@ -75,7 +80,7 @@ function Invoke-AIDiagnostics {
 		[parameter(Mandatory=$false)][string]$OutputPath = $(if ($IsLinux) { Join-Path $env:HOME 'Documents/Nitrogen' } else { Join-Path $env:USERPROFILE 'Documents\Nitrogen' }),
 		[parameter(Mandatory=$false)][switch]$SubmitPrompt,
 		[parameter(Mandatory=$false)][string]$CustomPrompt,
-		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity')][string]$Provider,
+		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity','Ollama')][string]$Provider,
 		[parameter(Mandatory=$false)][string]$Profile,
 		[parameter(Mandatory=$false)][string]$ConfigPath,
 		[parameter(Mandatory=$false)][string]$ApiKey,
@@ -239,6 +244,28 @@ function Invoke-AIDiagnostics {
 				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
 				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
 				$ProviderResponse = Invoke-PerplexityRequest @requestParams
+			}
+			'Ollama' {
+				$requestParams = @{
+					Prompt = $promptString
+					File   = $JsonFile
+				}
+				if (-not [string]::IsNullOrWhiteSpace($ResolvedApiKey)) { $requestParams['ApiKey'] = $ResolvedApiKey }
+				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
+				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
+				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
+				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+				$numCtx = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'numCtx'
+				if ($null -ne $numCtx) { $requestParams['NumCtx'] = [int]$numCtx }
+				$maxTokens = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'maxTokens'
+				if ($null -ne $maxTokens) { $requestParams['MaxTokens'] = [int]$maxTokens }
+				$timeoutSec = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'timeoutSec'
+				if ($null -ne $timeoutSec) { $requestParams['TimeoutSec'] = [int]$timeoutSec }
+				$keepAlive = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'keepAlive'
+				if (-not [string]::IsNullOrWhiteSpace($keepAlive)) { $requestParams['KeepAlive'] = $keepAlive }
+				$format = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'format'
+				if (-not [string]::IsNullOrWhiteSpace($format)) { $requestParams['Format'] = $format }
+				$ProviderResponse = Invoke-OllamaRequest @requestParams
 			}
 		}
 		$ResponseItems = @()

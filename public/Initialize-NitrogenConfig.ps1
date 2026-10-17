@@ -37,7 +37,7 @@ function Initialize-NitrogenConfig {
 		[Parameter(Mandatory = $false)][ValidateSet('Global', 'Local')][string]$Scope = 'Global',
 		[Parameter(Mandatory = $false)][string]$ConfigPath,
 		[Parameter(Mandatory = $false)][string]$ProfileName = 'default',
-		[Parameter(Mandatory = $false)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity')][string]$Provider = 'OpenAI',
+		[Parameter(Mandatory = $false)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity', 'Ollama')][string]$Provider = 'OpenAI',
 		[Parameter(Mandatory = $false)][string]$PromptKey = 'diagnostics.default',
 		[Parameter(Mandatory = $false)][string]$PromptText = 'Analyze diagnostics and return concise, actionable findings.',
 		[Parameter(Mandatory = $false)][ValidateRange(1, 5000)][int]$MaxItems = 100,
@@ -99,6 +99,13 @@ function Initialize-NitrogenConfig {
 			endpoint  = 'https://api.perplexity.ai/chat/completions'
 			model     = 'sonar-pro'
 			apiKeyRef = "nitrogen/$ProfileName/perplexity/api_key"
+		}
+		Ollama = @{
+			endpoint   = 'http://localhost:11434'
+			model      = 'llama3.1:8b'
+			numCtx     = 16384
+			maxTokens  = 2048
+			timeoutSec = 300
 		}
 	}
 
