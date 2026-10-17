@@ -11,6 +11,9 @@ function Get-GeminiModels {
 	.EXAMPLE
 		Get-GeminiModels
 		Retrieves the list of available Google Gemini models using the specified API key.
+	.EXAMPLE
+		Get-GeminiModels -Refresh
+		Forces a refresh of the cached models.
 	#>
 	[CmdletBinding()]
 	param(
@@ -34,10 +37,18 @@ function Get-GeminiModels {
 		$result = @()
 		foreach ($model in $response.models) {
 			$result += $([PSCustomObject]@{
-				Name        = $model.name -replace "models/", ""
-				DisplayName = $model.displayName
-				Description = $model.description
-			})
+					name                       = $model.name -replace "models/", ""
+					displayName                = $model.displayName
+					description                = $model.description
+					inputTokenLimit            = $model.inputTokenLimit
+					outputTokenLimit           = $model.outputTokenLimit
+					supportedGenerationMethods = $model.supportedGenerationMethods
+					temperature                = $model.temperature
+					topP                       = $model.topP
+					topK                       = $model.topK
+					maxTemperature             = $model.maxTemperature
+					thinking                   = $model.thinking
+				})
 		}
 		$global:GEMINI_MODELS = $result
 		return $result
