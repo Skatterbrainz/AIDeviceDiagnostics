@@ -1,0 +1,551 @@
+diff --git a/Nitrogen.psd1 b/Nitrogen.psd1
+index 5779213..d2ba909 100644
+--- a/Nitrogen.psd1
++++ b/Nitrogen.psd1
+@@ -12,7 +12,7 @@
+ RootModule = '.\Nitrogen.psm1'
+ 
+ # Version number of this module.
+-ModuleVersion = '1.2.0'
++ModuleVersion = '1.3.0'
+ 
+ # Supported PSEditions (Core, Desktop)
+ CompatiblePSEditions = @('Core', 'Desktop')
+@@ -77,7 +77,8 @@ FunctionsToExport = @(
+     'get-GeminiModels',
+     'get-OpenAIModels',
+     'get-AnthropicModels',
+-    'get-PerplexityModels'
++    'get-PerplexityModels',
++    'get-OllamaModels'
+ )
+ 
+ # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
+@@ -104,7 +105,7 @@ PrivateData = @{
+     PSData = @{
+ 
+         # Tags applied to this module. These help with module discovery in online galleries.
+-        Tags = @('ai','nitrogen','diagnostics','device','windows','linux','computer','troubleshoot','skatterbrainz','gemini','openai','perplexity','claude','anthropic')
++        Tags = @('ai','nitrogen','diagnostics','device','windows','linux','computer','troubleshoot','skatterbrainz','gemini','openai','perplexity','claude','anthropic','ollama')
+ 
+         # A URL to the license for this module.
+         LicenseUri = 'https://github.com/Skatterbrainz/Nitrogen/blob/main/LICENSE'
+diff --git a/README.md b/README.md
+index ace45c0..425e6b7 100644
+--- a/README.md
++++ b/README.md
+@@ -15,7 +15,7 @@ This module is designed for quick, repeatable diagnostics on local machines with
+ - collect only the scopes you care about
+ - capture problematic-only entries where supported
+ - persist output to disk for audit/sharing
+-- optionally submit a summary prompt to OpenAI, Anthropic, Azure OpenAI, Google Gemini, or Perplexity
++- optionally submit a summary prompt to OpenAI, Anthropic, Azure OpenAI, Google Gemini, Perplexity, or an on-premises [Ollama](https://ollama.com) server
+ 
+ ## ✨ Features
+ 
+@@ -165,6 +165,7 @@ You can pass `-ApiKey` directly, or set environment variables:
+ - `AZURE_OPENAI_ENDPOINT` (for Azure OpenAI)
+ - `GEMINI_API_KEY`
+ - `PERPLEXITY_API_KEY`
++- `OLLAMA_API_KEY` (optional, only needed if Ollama is behind an authenticating reverse proxy)
+ 
+ Or use SecretManagement and reference a secret name via `apiKeyRef`:
+ 
+@@ -192,11 +193,43 @@ Get-NitrogenConfig -Scope Local
+ Set-NitrogenPrompt -Scope Local -Key diagnostics.brief -Prompt "Summarize only urgent issues." -ProfileName default
+ ```
+ 
++## 🏠 On-Premises Models (Ollama)
++
++Nitrogen can submit diagnostics to a local or on-premises [Ollama](https://ollama.com) server instead of a paid cloud API. Diagnostics data never leaves your network.
++
++1. Install Ollama on a host (a GPU helps) and pull a model: `ollama pull llama3.1:8b`
++2. To serve other machines, set `OLLAMA_HOST=0.0.0.0:11434` on the Ollama host. By default it listens on localhost only.
++3. Point a provider entry at it in `config.json`:
++
++```json
++"Ollama": {
++  "endpoint": "http://ollama01.contoso.local:11434",
++  "model": "llama3.1:8b",
++  "numCtx": 16384,
++  "maxTokens": 2048,
++  "timeoutSec": 300
++}
++```
++
++4. Verify connectivity and available models, then run a diagnosis:
++
++```powershell
++Get-OllamaModels -Endpoint "http://ollama01.contoso.local:11434"
++Invoke-AIDiagnostics -Scope EventLog,Services -SubmitPrompt -Provider Ollama -PassThru
++```
++
++Notes:
++
++- `http://` endpoints are accepted for the Ollama provider only. Ollama has no built-in authentication or TLS, so if it is reachable beyond localhost, put it behind a reverse proxy with TLS and restrict access with a firewall. If the proxy requires a key, set `OLLAMA_API_KEY`.
++- `numCtx` is the context window in tokens. Ollama's default is small and silently truncates large inputs, so keep `numCtx` large enough for the data you collect. Nitrogen warns when `Diagnostics.json` looks too big. Lowering `-MaxItems` or collecting fewer scopes also helps.
++- Smaller local models follow the "return JSON" and "provide documentation URLs" instructions less reliably than hosted models. Set `"format": "json"` to constrain output, and treat any URLs as unverified.
++
+ ## Known Issues
+ 
+ - Tested against Gemini, OpenAI and Claude so far.
+ - File integration not yet enabled on AzureOpenAI or Perplexity
+-- Model queries only ready for Gemini, Perplexity, OpenAI
++- Model queries only ready for Gemini, Perplexity, OpenAI, Anthropic and Ollama
++- Ollama support is new and has not been tested against a wide range of models
+ 
+ ## Change/Revision History
+ 
+diff --git a/changelog.md b/changelog.md
+index 212f08a..2c58809 100644
+--- a/changelog.md
++++ b/changelog.md
+@@ -1,5 +1,13 @@
+ # Revision History
+ 
++## 1.3.0 - 2026-10-17
++- Added `Ollama` provider for on-premises / local models (`-Provider Ollama`).
++- Added `Get-OllamaModels` to list models on an Ollama server (`/api/tags`), with caching and `-Refresh`.
++- Ollama requests send the diagnostics JSON inline (no file upload API) via `/api/chat`, with configurable `numCtx`, `maxTokens`, `timeoutSec`, `keepAlive` and `format`.
++- Config validation now permits `http://` endpoints for the Ollama provider only. All other providers still require `https`.
++- API key is optional for Ollama (`OLLAMA_API_KEY` or `apiKeyRef`, only needed behind an authenticating proxy).
++- `Initialize-NitrogenConfig` now includes a starter `Ollama` provider block.
++
+ ## 1.2.0 - 2026-10-17
+ - Added `Get-AnthropicModels` to retrieve available Anthropic models.
+ - Enhanced `Get-GeminiModels` output to include expanded model metadata fields.
+diff --git a/docs/Get-OllamaModels.md b/docs/Get-OllamaModels.md
+new file mode 100644
+index 0000000..1a4b56e
+--- /dev/null
++++ b/docs/Get-OllamaModels.md
+@@ -0,0 +1,86 @@
++---
++external help file: Nitrogen-help.xml
++Module Name: Nitrogen
++online version: https://github.com/Skatterbrainz/Nitrogen/docs/Get-OllamaModels.md
++schema: 2.0.0
++---
++
++# Get-OllamaModels
++
++## SYNOPSIS
++Retrieves the list of models available on an Ollama server.
++
++## SYNTAX
++
++```powershell
++Get-OllamaModels [[-Endpoint] <String>] [[-ApiKey] <String>] [[-TimeoutSec] <Int32>] [-Refresh] [<CommonParameters>]
++```
++
++## DESCRIPTION
++
++Calls the Ollama `/api/tags` endpoint and returns the models that have been pulled to the server.
++
++Results are cached in-memory for the current session, per endpoint. Use `-Refresh` to force a new request.
++This is also a quick way to test connectivity to an on-premises Ollama server.
++
++Ollama does not require authentication. If `-ApiKey` is supplied, or `$env:OLLAMA_API_KEY` is set, it is sent
++as a Bearer token (useful when a reverse proxy sits in front of Ollama).
++
++## EXAMPLES
++
++### Example 1
++```powershell
++Get-OllamaModels
++```
++
++Lists the models on the local Ollama server (`http://localhost:11434`).
++
++### Example 2
++```powershell
++Get-OllamaModels -Endpoint "http://ollama01.contoso.local:11434" -Refresh
++```
++
++Lists the models on a remote Ollama server, bypassing the cache.
++
++## PARAMETERS
++
++### -Endpoint
++The Ollama server base URI. Defaults to `http://localhost:11434`.
++
++```yaml
++Type: String
++Required: False
++Position: 1
++Default value: http://localhost:11434
++```
++
++### -ApiKey
++Optional Bearer token for an authenticating proxy. Defaults to `$env:OLLAMA_API_KEY` when set.
++
++```yaml
++Type: String
++Required: False
++Position: 2
++```
++
++### -TimeoutSec
++Request timeout in seconds. Valid range is 1 to 3600.
++
++```yaml
++Type: Int32
++Required: False
++Position: 3
++Default value: 30
++```
++
++### -Refresh
++Bypasses the in-memory cache and requests the model list again.
++
++```yaml
++Type: SwitchParameter
++Required: False
++```
++
++## OUTPUTS
++
++`PSCustomObject` with `Name`, `ParameterSize`, `QuantizationLevel`, `Family`, `SizeGB` and `Modified`.
+diff --git a/private/Config.ps1 b/private/Config.ps1
+index 8a53b1c..b45f4fc 100644
+--- a/private/Config.ps1
++++ b/private/Config.ps1
+@@ -164,8 +164,11 @@ function Test-NitrogenConfig {
+ 				if (-not [Uri]::TryCreate($endpoint, [UriKind]::Absolute, [ref]$uri)) {
+ 					throw "Invalid config in '$Source': provider '$providerName' in profile '$profileName' has invalid endpoint '$endpoint'."
+ 				}
+-				if ($uri.Scheme -ne 'https') {
+-					throw "Invalid config in '$Source': provider '$providerName' in profile '$profileName' endpoint must use https."
++				# Ollama is typically hosted on-premises and serves plain http by default.
++				$allowedSchemes = if ($providerName -eq 'Ollama') { @('http', 'https') } else { @('https') }
++				if ($uri.Scheme -notin $allowedSchemes) {
++					$schemeHint = if ($providerName -eq 'Ollama') { 'http or https' } else { 'https' }
++					throw "Invalid config in '$Source': provider '$providerName' in profile '$profileName' endpoint must use $schemeHint."
+ 				}
+ 			}
+ 		}
+@@ -257,7 +260,7 @@ function Get-NitrogenPromptText {
+ function Get-NitrogenApiKey {
+ 	[CmdletBinding()]
+ 	param (
+-		[Parameter(Mandatory = $true)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity')][string]$Provider,
++		[Parameter(Mandatory = $true)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity', 'Ollama')][string]$Provider,
+ 		[Parameter(Mandatory = $false)][hashtable]$ProviderConfig = @{}
+ 	)
+ 	$envVarName = switch ($Provider) {
+@@ -266,6 +269,7 @@ function Get-NitrogenApiKey {
+ 		'AzureOpenAI'{ 'AZURE_OPENAI_API_KEY' }
+ 		'Google'     { 'GEMINI_API_KEY' }
+ 		'Perplexity' { 'PERPLEXITY_API_KEY' }
++		'Ollama'     { 'OLLAMA_API_KEY' }   # optional: Ollama itself needs no key
+ 	}
+ 	$envValue = [Environment]::GetEnvironmentVariable($envVarName)
+ 	if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+diff --git a/private/Invoke-OllamaRequest.ps1 b/private/Invoke-OllamaRequest.ps1
+new file mode 100644
+index 0000000..c55b6e9
+--- /dev/null
++++ b/private/Invoke-OllamaRequest.ps1
+@@ -0,0 +1,139 @@
++function Resolve-OllamaBaseUri {
++	<#
++	.SYNOPSIS
++		Normalizes an Ollama endpoint to a base URI with no trailing slash or API path.
++	.DESCRIPTION
++		Accepts "http://host:11434", "http://host:11434/" or a full path such as
++		"http://host:11434/api/chat" and returns "http://host:11434" so callers can append
++		the API path they need.
++	#>
++	[CmdletBinding()]
++	param (
++		[Parameter(Mandatory=$true)][string]$Endpoint
++	)
++	$base = $Endpoint.Trim().TrimEnd('/')
++	$base = $base -replace '/api(/[^/]+)*$', ''
++	return $base
++}
++
++function Invoke-OllamaRequest {
++	<#
++	.SYNOPSIS
++		Invokes a chat request against an on-premises Ollama server with the given prompt and file.
++	.DESCRIPTION
++		Reads the specified diagnostics file and sends its contents inline, together with the prompt,
++		to the Ollama /api/chat endpoint. Ollama has no file upload API, so the JSON content is
++		embedded in the user message. Returns the response text from the model.
++
++		Works in Windows PowerShell 5.1 and PowerShell 7+.
++	.PARAMETER Prompt
++		The prompt text to send to the model.
++	.PARAMETER File
++		The path to the diagnostics file whose content is included in the request.
++	.PARAMETER Endpoint
++		The Ollama server base URI. Defaults to "http://localhost:11434".
++		A full "/api/chat" URI is also accepted.
++	.PARAMETER ApiKey
++		Optional. Ollama does not require authentication. If supplied (or if OLLAMA_API_KEY is set),
++		it is sent as a Bearer token, which is useful when Ollama sits behind a reverse proxy.
++	.PARAMETER Model
++		The model to use. Defaults to "llama3.1:8b". The model must already be pulled on the server.
++	.PARAMETER NumCtx
++		Context window size in tokens. Defaults to 16384. Ollama's own default is small and will
++		silently truncate large diagnostics, so raise this for multi-scope collections.
++	.PARAMETER MaxTokens
++		Maximum number of tokens to generate (num_predict). Defaults to the server/model setting.
++	.PARAMETER TimeoutSec
++		Request timeout in seconds. Defaults to 300. Local inference can be slow on modest hardware.
++	.PARAMETER KeepAlive
++		How long the model stays loaded after the request (for example "10m"). Defaults to the server setting.
++	.PARAMETER Format
++		Optional. Set to "json" to constrain the model output to valid JSON.
++	.EXAMPLE
++		Invoke-OllamaRequest -Prompt "Analyze this data" -File "Diagnostics.json" -Endpoint "http://ollama01.contoso.local:11434" -Model "qwen2.5:14b"
++	.NOTES
++		The -Prompt and -File parameters are provided from Invoke-AIDiagnostics automatically.
++		A warning is written when the file is estimated to exceed about 80 percent of NumCtx.
++	#>
++	[CmdletBinding()]
++	param (
++		[Parameter(Mandatory=$true)][string]$Prompt,
++		[Parameter(Mandatory=$true)][string]$File,
++		[Parameter(Mandatory=$false)][string]$Endpoint = "http://localhost:11434",
++		[Parameter(Mandatory=$false)][string]$ApiKey,
++		[Parameter(Mandatory=$false)][string]$Model = "llama3.1:8b",
++		[Parameter(Mandatory=$false)][ValidateRange(512, 1048576)][int]$NumCtx = 16384,
++		[Parameter(Mandatory=$false)][int]$MaxTokens,
++		[Parameter(Mandatory=$false)][ValidateRange(1, 86400)][int]$TimeoutSec = 300,
++		[Parameter(Mandatory=$false)][string]$KeepAlive,
++		[Parameter(Mandatory=$false)][ValidateSet('json')][string]$Format
++	)
++	Write-Verbose "Invoking Ollama request with model $Model"
++	if (-not $ApiKey) { $ApiKey = $env:OLLAMA_API_KEY }
++	if (-not (Test-Path $File)) { throw "File not found: $File" }
++
++	$baseUri = Resolve-OllamaBaseUri -Endpoint $Endpoint
++	$chatUri = "$baseUri/api/chat"
++	Write-Verbose "Chat endpoint: $chatUri"
++
++	$data = Get-Content -Path $File -Raw -ErrorAction Stop
++	$estimatedTokens = [math]::Ceiling($data.Length / 4)
++	if ($estimatedTokens -gt ($NumCtx * 0.8)) {
++		$sizeWarning = "Diagnostics data is roughly $estimatedTokens tokens, which is close to or above the context window ($NumCtx). " +
++			"The model may truncate its input. Increase numCtx, reduce -MaxItems, or collect fewer scopes."
++		Write-Warning $sizeWarning
++	}
++
++	$content = "$Prompt`n`nDiagnostics data (JSON):`n``````json`n$data`n``````"
++
++	$options = @{ num_ctx = $NumCtx }
++	if ($PSBoundParameters.ContainsKey('MaxTokens') -and $MaxTokens -gt 0) { $options.num_predict = $MaxTokens }
++
++	$payload = @{
++		model    = $Model
++		stream   = $false
++		messages = @(
++			@{ role = "user"; content = $content }
++		)
++		options  = $options
++	}
++	if (-not [string]::IsNullOrWhiteSpace($KeepAlive)) { $payload.keep_alive = $KeepAlive }
++	if (-not [string]::IsNullOrWhiteSpace($Format))    { $payload.format = $Format }
++
++	$Body = $payload | ConvertTo-Json -Depth 10
++
++	$Headers = @{}
++	if (-not [string]::IsNullOrWhiteSpace($ApiKey)) { $Headers["Authorization"] = "Bearer $ApiKey" }
++
++	$requestParams = @{
++		Uri         = $chatUri
++		Method      = "Post"
++		Headers     = $Headers
++		Body        = ([System.Text.Encoding]::UTF8.GetBytes($Body))
++		ContentType = "application/json; charset=utf-8"
++		TimeoutSec  = $TimeoutSec
++		ErrorAction = 'Stop'
++	}
++	try {
++		$Response = Invoke-RestMethod @requestParams
++	}
++	catch {
++		$detail = $null
++		if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
++			$detail = $_.ErrorDetails.Message
++		}
++		elseif ($_.Exception.Response) {
++			try {
++				$reader = [System.IO.StreamReader]::new($_.Exception.Response.GetResponseStream())
++				$detail = $reader.ReadToEnd()
++			}
++			catch { }
++		}
++		throw "Ollama API request failed: $($_.Exception.Message)`n$detail"
++	}
++
++	if ($Response.done_reason -eq 'length') {
++		Write-Warning "The model stopped because it reached the output token limit. Increase maxTokens if the response looks cut off."
++	}
++	$Response.message.content
++}
+diff --git a/public/Initialize-NitrogenConfig.ps1 b/public/Initialize-NitrogenConfig.ps1
+index 14a13d9..2f12286 100644
+--- a/public/Initialize-NitrogenConfig.ps1
++++ b/public/Initialize-NitrogenConfig.ps1
+@@ -37,7 +37,7 @@ function Initialize-NitrogenConfig {
+ 		[Parameter(Mandatory = $false)][ValidateSet('Global', 'Local')][string]$Scope = 'Global',
+ 		[Parameter(Mandatory = $false)][string]$ConfigPath,
+ 		[Parameter(Mandatory = $false)][string]$ProfileName = 'default',
+-		[Parameter(Mandatory = $false)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity')][string]$Provider = 'OpenAI',
++		[Parameter(Mandatory = $false)][ValidateSet('OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity', 'Ollama')][string]$Provider = 'OpenAI',
+ 		[Parameter(Mandatory = $false)][string]$PromptKey = 'diagnostics.default',
+ 		[Parameter(Mandatory = $false)][string]$PromptText = 'Analyze diagnostics and return concise, actionable findings.',
+ 		[Parameter(Mandatory = $false)][ValidateRange(1, 5000)][int]$MaxItems = 100,
+@@ -100,6 +100,13 @@ function Initialize-NitrogenConfig {
+ 			model     = 'sonar-pro'
+ 			apiKeyRef = "nitrogen/$ProfileName/perplexity/api_key"
+ 		}
++		Ollama = @{
++			endpoint   = 'http://localhost:11434'
++			model      = 'llama3.1:8b'
++			numCtx     = 16384
++			maxTokens  = 2048
++			timeoutSec = 300
++		}
+ 	}
+ 
+ 	$config = @{
+diff --git a/public/Invoke-AIDiagnostics.ps1 b/public/Invoke-AIDiagnostics.ps1
+index d270cc8..cd1fe90 100644
+--- a/public/Invoke-AIDiagnostics.ps1
++++ b/public/Invoke-AIDiagnostics.ps1
+@@ -22,6 +22,7 @@ function Invoke-AIDiagnostics {
+ 		$env:GEMINI_API_KEY
+ 		$env:AZURE_OPENAI_API_KEY
+ 		$env:PERPLEXITY_API_KEY
++		$env:OLLAMA_API_KEY (optional, only needed behind an authenticating proxy)
+ 
+ 	.PARAMETER SubmitPrompt
+ 		Switch to submit the collected diagnostics to the AI provider.
+@@ -30,7 +31,11 @@ function Invoke-AIDiagnostics {
+ 		Specifies a custom prompt to submit to the AI provider.
+ 
+ 	.PARAMETER Provider
+-		Specifies the AI provider to use. Valid values are 'OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity'.
++		Specifies the AI provider to use. Valid values are 'OpenAI', 'Anthropic', 'AzureOpenAI', 'Google', 'Perplexity', 'Ollama'.
++
++		'Ollama' submits to an on-premises Ollama server. Set the server address and model under
++		providers.Ollama (endpoint, model, numCtx, maxTokens, timeoutSec, keepAlive, format) in config.json.
++		No API key is required.
+ 
+ 	.PARAMETER Profile
+ 		Specifies the configuration profile to use from config.json.
+@@ -75,7 +80,7 @@ function Invoke-AIDiagnostics {
+ 		[parameter(Mandatory=$false)][string]$OutputPath = $(if ($IsLinux) { Join-Path $env:HOME 'Documents/Nitrogen' } else { Join-Path $env:USERPROFILE 'Documents\Nitrogen' }),
+ 		[parameter(Mandatory=$false)][switch]$SubmitPrompt,
+ 		[parameter(Mandatory=$false)][string]$CustomPrompt,
+-		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity')][string]$Provider,
++		[parameter(Mandatory=$false)][ValidateSet('OpenAI','Anthropic','AzureOpenAI','Google','Perplexity','Ollama')][string]$Provider,
+ 		[parameter(Mandatory=$false)][string]$Profile,
+ 		[parameter(Mandatory=$false)][string]$ConfigPath,
+ 		[parameter(Mandatory=$false)][string]$ApiKey,
+@@ -240,6 +245,28 @@ function Invoke-AIDiagnostics {
+ 				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
+ 				$ProviderResponse = Invoke-PerplexityRequest @requestParams
+ 			}
++			'Ollama' {
++				$requestParams = @{
++					Prompt = $promptString
++					File   = $JsonFile
++				}
++				if (-not [string]::IsNullOrWhiteSpace($ResolvedApiKey)) { $requestParams['ApiKey'] = $ResolvedApiKey }
++				$endpoint = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'endpoint'
++				if (-not [string]::IsNullOrWhiteSpace($endpoint)) { $requestParams['Endpoint'] = $endpoint }
++				$model = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'model'
++				if (-not [string]::IsNullOrWhiteSpace($model)) { $requestParams['Model'] = $model }
++				$numCtx = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'numCtx'
++				if ($null -ne $numCtx) { $requestParams['NumCtx'] = [int]$numCtx }
++				$maxTokens = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'maxTokens'
++				if ($null -ne $maxTokens) { $requestParams['MaxTokens'] = [int]$maxTokens }
++				$timeoutSec = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'timeoutSec'
++				if ($null -ne $timeoutSec) { $requestParams['TimeoutSec'] = [int]$timeoutSec }
++				$keepAlive = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'keepAlive'
++				if (-not [string]::IsNullOrWhiteSpace($keepAlive)) { $requestParams['KeepAlive'] = $keepAlive }
++				$format = Get-NitrogenMemberValue -InputObject $ProviderConfig -Name 'format'
++				if (-not [string]::IsNullOrWhiteSpace($format)) { $requestParams['Format'] = $format }
++				$ProviderResponse = Invoke-OllamaRequest @requestParams
++			}
+ 		}
+ 		$ResponseItems = @()
+ 		if ($null -ne $ProviderResponse) {
+diff --git a/public/get-OllamaModels.ps1 b/public/get-OllamaModels.ps1
+new file mode 100644
+index 0000000..62e99ab
+--- /dev/null
++++ b/public/get-OllamaModels.ps1
+@@ -0,0 +1,67 @@
++function Get-OllamaModels {
++    <#
++    .SYNOPSIS
++        Retrieves the list of models available on an Ollama server.
++    .DESCRIPTION
++        Calls the Ollama /api/tags endpoint to list the models that have been pulled to the server.
++        Results are cached in-memory for the current session. Use -Refresh to bypass the cache.
++        This is also a quick way to test connectivity to an on-premises Ollama server.
++    .PARAMETER Endpoint
++        The Ollama server base URI. Defaults to "http://localhost:11434".
++    .PARAMETER ApiKey
++        Optional. Sent as a Bearer token if supplied, or if OLLAMA_API_KEY is set. Ollama itself does not
++        require authentication, but a reverse proxy in front of it might.
++    .PARAMETER TimeoutSec
++        Request timeout in seconds. Defaults to 30.
++    .PARAMETER Refresh
++        If specified, forces a refresh of the cached list of Ollama models.
++    .EXAMPLE
++        Get-OllamaModels
++        Lists the models on the local Ollama server.
++    .EXAMPLE
++        Get-OllamaModels -Endpoint "http://ollama01.contoso.local:11434" -Refresh
++        Lists the models on a remote Ollama server, bypassing the cache.
++    #>
++    [CmdletBinding()]
++    param (
++        [Parameter(Mandatory=$false)][string]$Endpoint = "http://localhost:11434",
++        [Parameter(Mandatory=$false)][string]$ApiKey,
++        [Parameter(Mandatory=$false)][ValidateRange(1, 3600)][int]$TimeoutSec = 30,
++        [Parameter(Mandatory=$false)][switch]$Refresh
++    )
++    if (-not $ApiKey) { $ApiKey = $env:OLLAMA_API_KEY }
++
++    $baseUri = Resolve-OllamaBaseUri -Endpoint $Endpoint
++
++    if ($global:OllamaModels -and $global:OllamaModelsEndpoint -eq $baseUri -and -not $Refresh) {
++        Write-Verbose 'Returning cached Ollama models'
++        return $global:OllamaModels
++    }
++
++    $headers = @{}
++    if (-not [string]::IsNullOrWhiteSpace($ApiKey)) { $headers["Authorization"] = "Bearer $ApiKey" }
++
++    try {
++        $response = Invoke-RestMethod -Uri "$baseUri/api/tags" -Method Get -Headers $headers `
++            -TimeoutSec $TimeoutSec -ErrorAction Stop
++    }
++    catch {
++        $detail = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { $null }
++        throw "Failed to list Ollama models from ${baseUri}: $($_.Exception.Message) $detail"
++    }
++
++    $models = @($response.models | ForEach-Object {
++        [pscustomobject]@{
++            Name              = $_.name
++            ParameterSize     = $_.details.parameter_size
++            QuantizationLevel = $_.details.quantization_level
++            Family            = $_.details.family
++            SizeGB            = [math]::Round($_.size / 1GB, 2)
++            Modified          = $_.modified_at
++        }
++    })
++
++    $global:OllamaModels = $models
++    $global:OllamaModelsEndpoint = $baseUri
++    $global:OllamaModels
++}

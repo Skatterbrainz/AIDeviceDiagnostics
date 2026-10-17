@@ -12,7 +12,7 @@
 RootModule = '.\Nitrogen.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.2.0'
+ModuleVersion = '1.3.0'
 
 # Supported PSEditions (Core, Desktop)
 CompatiblePSEditions = @('Core', 'Desktop')
@@ -77,7 +77,8 @@ FunctionsToExport = @(
     'get-GeminiModels',
     'get-OpenAIModels',
     'get-AnthropicModels',
-    'get-PerplexityModels'
+    'get-PerplexityModels',
+    'get-OllamaModels'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -104,7 +105,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('ai','nitrogen','diagnostics','device','windows','linux','computer','troubleshoot','skatterbrainz','gemini','openai','perplexity','claude','anthropic')
+        Tags = @('ai','nitrogen','diagnostics','device','windows','linux','computer','troubleshoot','skatterbrainz','gemini','openai','perplexity','claude','anthropic','ollama')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/Skatterbrainz/Nitrogen/blob/main/LICENSE'
